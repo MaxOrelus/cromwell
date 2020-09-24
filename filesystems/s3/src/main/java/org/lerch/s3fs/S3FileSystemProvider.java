@@ -390,6 +390,7 @@ public class S3FileSystemProvider extends FileSystemProvider {
         String directoryKey = s3Path.getKey().endsWith("/") ? s3Path.getKey() : s3Path.getKey() + "/";
         builder.bucket(bucketName)
                 .key(directoryKey)
+                .serverSideEncryption(ServerSideEncryption.AES256)
                 .contentLength(0L);
         s3Path.getFileSystem().getClient().putObject(builder.build(), RequestBody.fromBytes(new byte[0]));
     }

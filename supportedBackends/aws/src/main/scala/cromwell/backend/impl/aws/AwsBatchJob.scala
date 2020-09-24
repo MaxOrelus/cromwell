@@ -52,7 +52,7 @@ import software.amazon.awssdk.services.cloudwatchlogs.model.{GetLogEventsRequest
 import software.amazon.awssdk.services.ecs.EcsClient
 import software.amazon.awssdk.services.ecs.model.DescribeContainerInstancesRequest
 import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, HeadObjectRequest, NoSuchKeyException, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{GetObjectRequest, HeadObjectRequest, NoSuchKeyException, PutObjectRequest, ServerSideEncryption}
 import wdl4s.parser.MemoryUnit
 
 import scala.collection.JavaConverters._
@@ -125,13 +125,13 @@ final case class AwsBatchJob(jobDescriptor: BackendJobDescriptor, // WDL/CWL
       case input: AwsBatchFileInput if input.s3key.startsWith("s3://") && input.s3key.endsWith(".tmp") =>
         //we are localizing a tmp file which may contain workdirectory paths that need to be reconfigured
         s"""
-           |$s3Cmd cp --no-progress ${input.s3key} $workDir/${input.local}
+           |$s3Cmd cp --sse AES256 --no-progress ${input.s3key} $workDir/${input.local}
            |sed -i 's#${AwsBatchWorkingDisk.MountPoint.pathAsString}#$workDir#g' $workDir/${input.local}
            |""".stripMargin
 
 
       case input: AwsBatchFileInput if input.s3key.startsWith("s3://") =>
-        s"$s3Cmd cp --no-progress ${input.s3key} ${input.mount.mountPoint.pathAsString}/${input.local}"
+        s"$s3Cmd cp --sse AES256 --no-progress ${input.s3key} ${input.mount.mountPoint.pathAsString}/${input.local}"
           .replaceAllLiterally(AwsBatchWorkingDisk.MountPoint.pathAsString, workDir)
 
       case input: AwsBatchFileInput =>
@@ -174,24 +174,24 @@ final case class AwsBatchJob(jobDescriptor: BackendJobDescriptor, // WDL/CWL
          */
         s"""
            |touch ${output.name}
-           |$s3Cmd cp --no-progress ${output.name} ${output.s3key}
-           |if [ -e $globDirectory ]; then $s3Cmd cp --no-progress $globDirectory $s3GlobOutDirectory --recursive --exclude "cromwell_glob_control_file"; fi
+           |$s3Cmd cp --sse AES256 --no-progress ${output.name} ${output.s3key}
+           |if [ -e $globDirectory ]; then $s3Cmd cp --sse AES256 --no-progress $globDirectory $s3GlobOutDirectory --recursive --exclude "cromwell_glob_control_file"; fi
            |""".stripMargin
 
       case output: AwsBatchFileOutput if output.s3key.startsWith("s3://") && output.mount.mountPoint.pathAsString == AwsBatchWorkingDisk.MountPoint.pathAsString =>
         //output is on working disk mount
         s"""
-           |$s3Cmd cp --no-progress $workDir/${output.local.pathAsString} ${output.s3key}
+           |$s3Cmd cp --sse AES256 --no-progress $workDir/${output.local.pathAsString} ${output.s3key}
            |""".stripMargin
       case output: AwsBatchFileOutput =>
         //output on a different mount
-        s"$s3Cmd cp --no-progress ${output.mount.mountPoint.pathAsString}/${output.local.pathAsString} ${output.s3key}"
+        s"$s3Cmd cp --sse AES256 --no-progress ${output.mount.mountPoint.pathAsString}/${output.local.pathAsString} ${output.s3key}"
       case _ => ""
     }.mkString("\n") + "\n" +
       s"""
-         |if [ -f $workDir/${jobPaths.returnCodeFilename} ]; then $s3Cmd cp --no-progress $workDir/${jobPaths.returnCodeFilename} ${jobPaths.callRoot.pathAsString}/${jobPaths.returnCodeFilename} ; fi\n
-         |if [ -f $stdErr ]; then $s3Cmd cp --no-progress $stdErr ${jobPaths.standardPaths.error.pathAsString}; fi
-         |if [ -f $stdOut ]; then $s3Cmd cp --no-progress $stdOut ${jobPaths.standardPaths.output.pathAsString}; fi
+         |if [ -f $workDir/${jobPaths.returnCodeFilename} ]; then $s3Cmd cp --sse AES256 --no-progress $workDir/${jobPaths.returnCodeFilename} ${jobPaths.callRoot.pathAsString}/${jobPaths.returnCodeFilename} ; fi\n
+         |if [ -f $stdErr ]; then $s3Cmd cp --sse AES256 --no-progress $stdErr ${jobPaths.standardPaths.error.pathAsString}; fi
+         |if [ -f $stdOut ]; then $s3Cmd cp --sse AES256 --no-progress $stdOut ${jobPaths.standardPaths.output.pathAsString}; fi
          |""".stripMargin
 
 
@@ -292,6 +292,7 @@ final case class AwsBatchJob(jobDescriptor: BackendJobDescriptor, // WDL/CWL
         val putRequest = PutObjectRequest.builder()
           .bucket(bucketName) //remove the "s3://" prefix
           .key(scriptKeyPrefix + key)
+          .serverSideEncryption(ServerSideEncryption.AES256)
           .build
 
         s3Client.putObject(putRequest, RequestBody.fromString(commandLine))
@@ -302,7 +303,7 @@ final case class AwsBatchJob(jobDescriptor: BackendJobDescriptor, // WDL/CWL
   }
 
   private def writeReconfiguredScriptForAudit( reconfiguredScript: String, bucketName: String, key: String) = {
-    val putObjectRequest = PutObjectRequest.builder().bucket(bucketName).key(key).build()
+    val putObjectRequest = PutObjectRequest.builder().bucket(bucketName).key(key).serverSideEncryption(ServerSideEncryption.AES256).build()
     s3Client.putObject(putObjectRequest, RequestBody.fromString(reconfiguredScript))
   }
 

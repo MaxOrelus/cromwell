@@ -21,6 +21,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 
 public class S3SeekableByteChannel implements SeekableByteChannel, S3Channel {
 
@@ -114,6 +115,7 @@ public class S3SeekableByteChannel implements SeekableByteChannel, S3Channel {
 
             builder.bucket(path.getFileStore().name());
             builder.key(path.getKey());
+            builder.serverSideEncryption(ServerSideEncryption.AES256);
 
             S3Client client = path.getFileSystem().getClient();
 

@@ -20,6 +20,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 
 import static java.lang.String.format;
 
@@ -169,6 +170,7 @@ public class S3FileChannel extends FileChannel implements S3Channel {
             builder.bucket(path.getFileStore().name())
                    .key(path.getKey())
                    .contentLength(length)
+                   .serverSideEncryption(ServerSideEncryption.AES256)
                    .contentType(new Tika().detect(stream, path.getFileName().toString()));
 
             path.getFileSystem().getClient().putObject(builder.build(), RequestBody.fromInputStream(stream, length));
